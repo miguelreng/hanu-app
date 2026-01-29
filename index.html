@@ -151,15 +151,17 @@
         function hanuReply(text) {
             setMood('speaking');
             respText.innerText = '';
+            let words = text.split(' ');
             let i = 0;
             const interval = setInterval(() => {
-                respText.innerText += text[i];
-                i++;
-                if (i >= text.length) {
+                if (i < words.length) {
+                    respText.innerText += (i === 0 ? '' : ' ') + words[i];
+                    i++;
+                } else {
                     clearInterval(interval);
                     setTimeout(() => setMood(''), 2000);
                 }
-            }, 50);
+            }, 100);
         }
 
         btn.onclick = () => {
