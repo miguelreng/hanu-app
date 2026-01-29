@@ -248,9 +248,34 @@
             postToRepo(val);
         };
 
-        input.addEventListener('keypress', (e) => { if(e.key === 'Enter') btn.onclick(); });
+        async function pollForResponse() {
+            const token = localStorage.getItem('gh_token');
+            if (!token) return;
 
-        document.addEventListener('mousemove', (e) => {
+            try {
+                // Buscamos comentarios en el último issue que enviamos o un issue de respuesta especial
+                const response = await fetch('https://api.github.com/repos/miguelreng/hanu-app/issues?state=closed&labels=hanu-reply', {
+                    headers: { 'Authorization': `token ${token}` }
+                });
+                const issues = await response.json();
+                
+                if (issues.length > 0) {
+                    const lastReply = issues[0];
+                    const replyId = lastReply.number;
+                    const lastSeenReply = localStorage.getItem('last_seen_reply');
+
+                    if (replyId.toString() !== lastSeenReply) {
+                        localStorage.setItem('last_seen_reply', replyId);
+                        hanuReply(lastReply.body);
+                        
+                        // Opcional: Hablar si hay TTS configurado (simulado por ahora)
+                        console.log("Hanu dice: " + lastReply.body);
+                    }
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        setInterval(pollForResponse, 5000); // Revisar respuesta cada 5 seg
             const x = (e.clientX / window.innerWidth - 0.5) * 20;
             const y = (e.clientY / window.innerHeight - 0.5) * 20;
             face.style.transform = `translate(${x}px, ${y}px)`;
