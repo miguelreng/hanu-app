@@ -133,6 +133,7 @@
         .input-tech {
             background: #111; border: 1px solid var(--hanu-cyan); color: white;
             padding: 15px; width: 100%; font-family: inherit;
+            overflow-x: hidden;
         }
     </style>
 </head>
@@ -176,7 +177,7 @@
         const msgBox = document.getElementById('msg-box');
         const input = document.getElementById('user-input');
         const btn = document.getElementById('send-btn');
-        const settingsBtn = document.getElementById('settings-btn');
+        const settingsSidebarBtn = document.getElementById('settings-btn');
         const settingsModal = document.getElementById('settings-modal');
         const saveBtn = document.getElementById('save-settings');
         const closeBtn = document.getElementById('close-settings');
@@ -188,13 +189,15 @@
         ghTokenInput.value = localStorage.getItem('gh_token') || '';
         brainUrlInput.value = localStorage.getItem('brain_url') || '';
 
-        settingsBtn.onclick = () => settingsModal.style.display = 'flex';
+        settingsSidebarBtn.onclick = () => settingsModal.style.display = 'flex';
         closeBtn.onclick = () => settingsModal.style.display = 'none';
         saveBtn.onclick = () => {
-            localStorage.setItem('gh_token', ghTokenInput.value);
-            localStorage.setItem('brain_url', brainUrlInput.value);
+            const cleanToken = ghTokenInput.value.trim();
+            localStorage.setItem('gh_token', cleanToken);
+            localStorage.setItem('brain_url', brainUrlInput.value.trim());
             settingsModal.style.display = 'none';
-            location.reload();
+            msgBox.innerHTML = '>> SYSTEM REBOOTING...';
+            setTimeout(() => location.reload(), 500);
         }
 
         function setExpression(state) {
@@ -206,16 +209,21 @@
 
         function typeWriter(text, isUser = false) {
             setExpression(isUser ? '' : 'speaking');
+            const newLine = document.createElement('div');
+            newLine.style.marginBottom = '10px';
+            
             if (isUser) {
-                msgBox.innerHTML += `<br><span style="color:white">[USER]: ${text}</span><br>>> ANALYZING...`;
+                newLine.innerHTML = `<span style="color:white">[USER]: ${text}</span><br>>> ANALYZING...`;
+                msgBox.appendChild(newLine);
                 msgBox.scrollTop = msgBox.scrollHeight;
                 return;
             }
 
-            msgBox.innerHTML = '>> ';
+            newLine.innerHTML = '>> ';
+            msgBox.appendChild(newLine);
             let i = 0;
             const interval = setInterval(() => {
-                msgBox.innerHTML += text[i];
+                newLine.innerHTML += text[i];
                 msgBox.scrollTop = msgBox.scrollHeight;
                 i++;
                 if (i >= text.length) {
@@ -244,23 +252,18 @@
                     },
                     body: JSON.stringify({ title: `MSG: ${message}`, body: `UPLINK` })
                 });
-                if (res.ok) {
-                    statusEl.innerText = "Hanu OS // MSG_SENT";
-                } else {
-                    statusEl.innerText = "Hanu OS // SEND_FAILED";
-                }
-            } catch(e) { 
-                console.error("GitHub Error", e);
-                statusEl.innerText = "Hanu OS // OFFLINE";
-            }
+                if (res.ok) statusEl.innerText = "Hanu OS // MSG_SENT";
+                else statusEl.innerText = "Hanu OS // AUTH_ERR";
+            } catch(e) { statusEl.innerText = "Hanu OS // OFFLINE"; }
         }
 
         async function pollReplies() {
             const token = localStorage.getItem('gh_token');
             if (!token) return;
             try {
-                // Buscamos cualquier issue con label hanu-reply, ordenados por fecha
-                const response = await fetch('https://api.github.com/repos/miguelreng/hanu-app/issues?state=all&labels=hanu-reply&sort=created&direction=desc', {
+                // Forzamos que no haya cache en el fetch
+                const url = `https://api.github.com/repos/miguelreng/hanu-app/issues?state=all&labels=hanu-reply&sort=created&direction=desc&_=${Date.now()}`;
+                const response = await fetch(url, {
                     headers: { 
                         'Authorization': `token ${token}`,
                         'Accept': 'application/vnd.github.v3+json'
@@ -286,10 +289,8 @@
         };
 
         input.addEventListener('keypress', (e) => { if(e.key === 'Enter') btn.onclick(); });
-        
         setInterval(pollReplies, 3000);
 
-        // Visual follow para touch/mouse
         const handleMove = (e) => {
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -297,7 +298,6 @@
             const y = (clientY / window.innerHeight - 0.5) * 30;
             core.style.transform = `perspective(1000px) rotateY(${x}deg) rotateX(${-y}deg)`;
         };
-
         document.addEventListener('mousemove', handleMove);
         document.addEventListener('touchmove', handleMove);
     </script>
