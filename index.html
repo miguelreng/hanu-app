@@ -212,8 +212,13 @@
             else mouth.classList.remove('glitch-anim');
         }
 
-        function typeWriter(text) {
-            setExpression('speaking');
+        function typeWriter(text, isUser = false) {
+            setExpression(isUser ? '' : 'speaking');
+            if (!isUser) msgBox.innerHTML = '>> ';
+            else msgBox.innerHTML += `<br><span style="color:white">[USER]: ${text}</span><br>>> ANALYZING...`;
+            
+            if (isUser) return;
+
             msgBox.innerHTML = '>> ';
             let i = 0;
             const interval = setInterval(() => {
@@ -230,27 +235,31 @@
             const token = localStorage.getItem('gh_token');
             const brainUrl = localStorage.getItem('brain_url');
 
-            setExpression('thinking');
-            msgBox.innerHTML = '>> ANALYZING_NEURAL_PULSE...';
+            typeWriter(message, true);
 
             if (brainUrl) {
                 try {
                     await fetch(`${brainUrl}/api/chat`, {
                         method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ message }),
                         mode: 'no-cors'
                     });
-                } catch(e) {}
+                } catch(e) { console.error("Tunnel error", e); }
             }
 
             if (token) {
                 try {
-                    await fetch('https://api.github.com/repos/miguelreng/hanu-app/issues', {
+                    const res = await fetch('https://api.github.com/repos/miguelreng/hanu-app/issues', {
                         method: 'POST',
-                        headers: { 'Authorization': `token ${token}` },
+                        headers: { 
+                            'Authorization': `token ${token}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        },
                         body: JSON.stringify({ title: `MSG: ${message}`, body: `UPLINK` })
                     });
-                } catch(e) {}
+                    if (!res.ok) console.error("GitHub error", await res.text());
+                } catch(e) { console.error("Network error", e); }
             }
         }
 
