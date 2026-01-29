@@ -58,15 +58,6 @@
             display: flex; align-items: center; justify-content: center;
         }
 
-        .pixel-face {
-            position: absolute; width: 100%; height: 100%;
-            display: grid; grid-template-columns: repeat(10, 1fr); grid-template-rows: repeat(10, 1fr);
-            filter: drop-shadow(0 0 15px var(--hanu-cyan));
-        }
-
-        #face-grid { width: 100%; height: 100%; position: relative; }
-
-        /* Pixel Eyes */
         .eye-container {
             position: absolute; top: 25%; width: 60px; height: 80px;
             background: var(--hanu-cyan); border-radius: 4px;
@@ -92,8 +83,8 @@
         }
 
         /* Expression States */
-        .thinking .eye-container { height: 10px; top: 45%; border-radius: 0; }
-        .speaking #mouth { height: 40px; }
+        #hanu-core.thinking .eye-container { height: 10px; top: 45%; border-radius: 0; }
+        #hanu-core.speaking #mouth { height: 40px; }
         .glitch-anim { animation: glitch 0.3s steps(2) infinite; }
 
         @keyframes glitch {
@@ -153,7 +144,7 @@
 <body>
 
     <header>
-        <div class="status-bar">Hanu OS // System Overloaded</div>
+        <div class="status-bar">Hanu OS // System Online</div>
         <button id="settings-btn">⚙️</button>
     </header>
 
@@ -214,15 +205,17 @@
 
         function typeWriter(text, isUser = false) {
             setExpression(isUser ? '' : 'speaking');
-            if (!isUser) msgBox.innerHTML = '>> ';
-            else msgBox.innerHTML += `<br><span style="color:white">[USER]: ${text}</span><br>>> ANALYZING...`;
-            
-            if (isUser) return;
+            if (isUser) {
+                msgBox.innerHTML += `<br><span style="color:white">[USER]: ${text}</span><br>>> ANALYZING...`;
+                msgBox.scrollTop = msgBox.scrollHeight;
+                return;
+            }
 
             msgBox.innerHTML = '>> ';
             let i = 0;
             const interval = setInterval(() => {
                 msgBox.innerHTML += text[i];
+                msgBox.scrollTop = msgBox.scrollHeight;
                 i++;
                 if (i >= text.length) {
                     clearInterval(interval);
@@ -237,20 +230,9 @@
 
             typeWriter(message, true);
 
-            if (brainUrl) {
-                try {
-                    await fetch(`${brainUrl}/api/chat`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message }),
-                        mode: 'no-cors'
-                    });
-                } catch(e) { console.error("Tunnel error", e); }
-            }
-
             if (token) {
                 try {
-                    const res = await fetch('https://api.github.com/repos/miguelreng/hanu-app/issues', {
+                    await fetch('https://api.github.com/repos/miguelreng/hanu-app/issues', {
                         method: 'POST',
                         headers: { 
                             'Authorization': `token ${token}`,
@@ -258,8 +240,7 @@
                         },
                         body: JSON.stringify({ title: `MSG: ${message}`, body: `UPLINK` })
                     });
-                    if (!res.ok) console.error("GitHub error", await res.text());
-                } catch(e) { console.error("Network error", e); }
+                } catch(e) { console.error("GitHub Error", e); }
             }
         }
 
@@ -267,18 +248,23 @@
             const token = localStorage.getItem('gh_token');
             if (!token) return;
             try {
-                const response = await fetch('https://api.github.com/repos/miguelreng/hanu-app/issues?state=closed&labels=hanu-reply', {
-                    headers: { 'Authorization': `token ${token}` }
+                // Buscamos cualquier issue (open o closed) con el label hanu-reply, ordenados por creación
+                const response = await fetch('https://api.github.com/repos/miguelreng/hanu-app/issues?state=all&labels=hanu-reply&sort=created&direction=desc', {
+                    headers: { 
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
                 });
                 const issues = await response.json();
-                if (issues.length > 0) {
+                if (issues && issues.length > 0) {
                     const lastReply = issues[0];
-                    if (lastReply.number.toString() !== localStorage.getItem('last_seen_reply')) {
+                    const lastSeen = localStorage.getItem('last_seen_reply');
+                    if (lastReply.number.toString() !== lastSeen) {
                         localStorage.setItem('last_seen_reply', lastReply.number);
                         typeWriter(lastReply.body);
                     }
                 }
-            } catch (err) {}
+            } catch (err) { console.error("Poll error:", err); }
         }
 
         btn.onclick = () => {
@@ -289,9 +275,10 @@
         };
 
         input.addEventListener('keypress', (e) => { if(e.key === 'Enter') btn.onclick(); });
-        setInterval(pollReplies, 4000);
+        
+        // Polling constante cada 2 segundos para máxima velocidad
+        setInterval(pollReplies, 2000);
 
-        // Tech visual follow
         document.addEventListener('mousemove', (e) => {
             const x = (e.clientX / window.innerWidth - 0.5) * 30;
             const y = (e.clientY / window.innerHeight - 0.5) * 30;
