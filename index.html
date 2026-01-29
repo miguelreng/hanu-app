@@ -149,7 +149,8 @@
         <h3>Configuración</h3>
         <p>GitHub PAT:</p>
         <input type="password" id="gh-token" placeholder="ghp_xxx...">
-        <p>Repo: miguelreng/hanu-app</p>
+        <p>URL del Cerebro (opcional):</p>
+        <input type="text" id="brain-url" placeholder="https://xxx.trycloudflare.com">
         <button id="save-settings">Guardar y Cerrar</button>
     </div>
 
@@ -173,15 +174,18 @@
         const input = document.getElementById('user-input');
         const btn = document.getElementById('send-btn');
         const ghTokenInput = document.getElementById('gh-token');
+        const brainUrlInput = document.getElementById('brain-url');
         const settingsBtn = document.getElementById('settings-btn');
         const settingsModal = document.getElementById('settings-modal');
         const saveSettingsBtn = document.getElementById('save-settings');
 
         ghTokenInput.value = localStorage.getItem('gh_token') || '';
+        brainUrlInput.value = localStorage.getItem('brain_url') || '';
 
         settingsBtn.onclick = () => settingsModal.style.display = 'flex';
         saveSettingsBtn.onclick = () => {
             localStorage.setItem('gh_token', ghTokenInput.value);
+            localStorage.setItem('brain_url', brainUrlInput.value);
             settingsModal.style.display = 'none';
         };
 
@@ -208,6 +212,19 @@
 
         async function postToRepo(message) {
             const token = localStorage.getItem('gh_token');
+            const brainUrl = localStorage.getItem('brain_url');
+
+            // Si hay tunnel URL, intentamos comunicación directa primero
+            if (brainUrl) {
+                try {
+                    const directResponse = await fetch(`${brainUrl}/api/chat`, {
+                        method: 'POST',
+                        body: JSON.stringify({ message })
+                    });
+                    // Si el tunnel responde, manejamos la respuesta aquí
+                } catch(e) { console.log("Cerebro no disponible via tunnel, usando fallback GitHub"); }
+            }
+
             if (!token) {
                 alert("Configura tu GitHub Token en el icono de ⚙️");
                 return;
@@ -215,23 +232,11 @@
             try {
                 const response = await fetch('https://api.github.com/repos/miguelreng/hanu-app/issues', {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                    },
-                    body: JSON.stringify({
-                        title: `MSG: ${message}`,
-                        body: `Enviado desde la App.`
-                    })
+                    headers: { 'Authorization': `token ${token}` },
+                    body: JSON.stringify({ title: `MSG: ${message}`, body: `Enviado desde la App.` })
                 });
-                if (response.ok) {
-                    hanuReply("Mensaje enviado. Espera mi respuesta...");
-                } else {
-                    hanuReply("Error de token o repo.");
-                }
-            } catch (err) {
-                hanuReply("Error de red.");
-            }
+                if (response.ok) { hanuReply("Mensaje enviado..."); }
+            } catch (err) { hanuReply("Error de red."); }
         }
 
         async function pollForResponse() {
